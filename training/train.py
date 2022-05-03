@@ -7,28 +7,31 @@ from tqdm import tqdm
 
 def train(model, dataset_loader):
     optim = torch.optim.AdamW(model.parameters(), lr=0.001)
+    bs = 10
+    neg_samples = 100
+    embd_dim = 300 
 
-    # the gold standard is always on the 0th index
     for contrastive_batch in tqdm(dataset_loader):
         # source lang is bs x embedding_dim
         # target lang is bs x neg_samples x embedding_dim
-
+        
         #embed
-        embedded_source, embedded_target = model.source_encoder(contrastive_batch)
+        embedded_source, embedded_target = model(contrastive_batch)
 
         def loss(embedded_source, embedded_target):
             """
             Implements InfoNCE loss
             """
             # compute the logits
-            logits = torch.bmm(embedded_source, embedded_target.transpose(1, 2))
+            logits = torch.bmm(embedded_source.unsqueeze(1), embedded_target.transpose(1, 2))
             # softmax
-            logits = torch.nn.functional.log_softmax(logits, dim=2)
+            logits = torch.nn.functional.log_softmax(logits, dim=2).squeeze(1)
+
             # sum along the 0th column
-            return -torch.sum(logits, dim=1)
+            return -logits[:, 0].mean()
 
         loss_value = loss(embedded_source, embedded_target)
-        loss.backward()
+        loss_value.backward()
         optim.step()
         tqdm.write(f"loss: {loss_value}")
         optim.zero_grad()
@@ -38,4 +41,5 @@ if __name__ == "__main__":
     outpt_embd_size = 300
 
     model = SourceTargetDPR(inpt_embd_size, outpt_embd_size)
-    dataset = ContrastiveDataset(inpt_embd_size, outpt_embd_size)
+    #dataset = ContrastiveDataset(inpt_embd_size, outpt_embd_size)
+    train(model, None)

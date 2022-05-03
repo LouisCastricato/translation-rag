@@ -1,6 +1,10 @@
 import numpy as np 
 from numpy import random
-from ..data_utils import *
+import sys
+
+sys.path.append('.')
+from data_utils import *
+
 
 
 # dictionary where the key is an english word and the value is the word in a target language

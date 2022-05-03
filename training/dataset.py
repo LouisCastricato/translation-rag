@@ -1,13 +1,18 @@
 # this file loads a fasttext indexed dataset and wraps it in a pytorch dataset
-
+import sys
 import torch
 from gensim.models.fasttext import load_facebook_vectors
 from gensim.test.utils import datapath
-from ..data_utils import *
 import random
+from numpy.random import choice
+
+sys.path.append('.')
+from data_utils import *
+
+
 
 class FastTextDataset(torch.utils.data.Dataset):
-    def __init__(self, dir):
+    def __init__(self, dir, debug = False):
         self.fasttext = load_facebook_vectors(datapath(dir))
         self.vocab_size = len(self.fasttext.key_to_index.keys())
         self.keys = list(self.fasttext.key_to_index.keys())
@@ -15,7 +20,7 @@ class FastTextDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.vocab_size
     
-    def get_random_key():
+    def get_random_key(self):
         """
         Returns a random word from the dataset
         """
@@ -41,8 +46,8 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         :param index: The index of the gold tuple
         """
         source_word, target_word = self.pair_dataset[index]
-        source_embedding = self.source_dataset.get_vector(source_word)
-        target_embedding = self.target_dataset.get_vector(target_word)
+        anchor = self.source_dataset.get_vector(source_word)
+        positive = self.target_dataset.get_vector(target_word)
 
         # use 100 random samples from the target dataset
         negative_samples = []
@@ -50,20 +55,25 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
             negative_samples.append(self.target_dataset.get_vector(self.target_dataset.get_random_key()))
         
         # use gold samples from other gold tuples
-        
+        # first randomly sample pair_dataset - index
+        discrete_dist = list(range(len(self.pair_dataset))).remove(index)
+        sampled_gold = choice(discrete_dist, size=20)
+        for idx in sampled_gold:
+            negative_samples.append(self.target_dataset.get_vector(self.pair_dataset[idx][1]))
 
+        # concat the target embedding and the negative samples
+        positive = torch.tensor(positive).unsqueeze(1)
+        negative_samples = list(map(lambda x: torch.tensor(x).unsqueeze(1), negative_samples))
+        target_batch = torch.cat([positive] + negative_samples, dim=1)
 
-        
-    def add_word(self, source_word):
-        """
-        Given the source word, finds a similar word in the target dataset
-        :param source_word: the word to find a similar word for
-        """
-        source_vector = self.source_dataset.get_vector(source_word)
+        return torch.tensor(anchor), target_batch
 
 
 # test functionality
 if __name__ == '__main__':
-    dataset = FastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin')
-    print(dataset.vocab_size)
-    print(dataset.get_vector('the'))
+    dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
+                                    '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
+                                    'en-es.csv')
+    source, target = dataset[0]
+    print(source.shape)
+    print(target.shape)

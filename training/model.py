@@ -1,4 +1,5 @@
 import torch
+from torch import nn
 
 # implements a single layer DPR model
 class SingeLayerDPR(torch.nn.Module):
