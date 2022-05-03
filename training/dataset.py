@@ -46,7 +46,7 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         :param index: The index of the gold tuple
         """
         source_word, target_word = self.pair_dataset[index]
-        anchor = self.source_dataset.get_vector(source_word)
+        anchor = torch.tensor(self.source_dataset.get_vector(source_word))
         positive = self.target_dataset.get_vector(target_word)
 
         # use 100 random samples from the target dataset
@@ -56,7 +56,9 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         
         # use gold samples from other gold tuples
         # first randomly sample pair_dataset - index
-        discrete_dist = list(range(len(self.pair_dataset))).remove(index)
+        discrete_dist = list(range(len(self.pair_dataset)))
+        discrete_dist.remove(index)
+
         sampled_gold = choice(discrete_dist, size=20)
         for idx in sampled_gold:
             negative_samples.append(self.target_dataset.get_vector(self.pair_dataset[idx][1]))
@@ -66,7 +68,11 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         negative_samples = list(map(lambda x: torch.tensor(x).unsqueeze(1), negative_samples))
         target_batch = torch.cat([positive] + negative_samples, dim=1)
 
-        return torch.tensor(anchor), target_batch
+
+        return {
+            "anchor" : anchor.unsqueeze(0),
+            "target_batch" : torch.transpose(target_batch).unsqueeze(0)
+        }
 
 
 # test functionality
