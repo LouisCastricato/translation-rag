@@ -26,7 +26,7 @@ def embed(model : SourceTargetDPR, dataset : DataLoader, paired_words : Iterable
 
         #embed
         _, embedded_target = model(contrastive_batch)
-        word_embedding.append((paired_words[1][idx], embedded_target[0].detach().numpy()))
+        word_embedding.append((paired_words[idx][1], embedded_target[0].detach().numpy()))
     return word_embedding
 
 
@@ -40,4 +40,11 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load('model.pt'))
 
     embeddings = embed(model, dataloader, word_pairings)
-    print(embeddings[0])
+
+    index = DenseFlatIndexer()
+    # set the vector size
+    index.init_index(300)
+    # index the embeddings we just computed 
+    index.index_data(embeddings)
+    # save to disk
+    index.serialize('en-es')
