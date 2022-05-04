@@ -40,6 +40,9 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         # Given a set of vectors in the source dataset, find the closest vectors in the target dataset
         self.pair_dataset = load_space_delimited(pairing_dir)
 
+    def __len__(self):
+        return len(self.pair_dataset)
+        
     def __getitem__(self, index):
         """
         Constructs a batch
@@ -71,15 +74,38 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
 
         return {
             "anchor" : anchor.unsqueeze(0),
-            "target_batch" : torch.transpose(target_batch).unsqueeze(0)
+            "target_batch" : torch.transpose(target_batch, 0, 1).unsqueeze(0)
         }
 
+# takes the dataset produced by PairedFastTextDataset, to avoid processing time
+class ProcessedPairedTextDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset_dir):
+        self.data = load_json(dataset_dir)
+
+        # convert the dataset that is saved as a list to torch tensors
+        for k,v in self.data.items():
+            self.data[k] = torch.tensor(v)
+
+    def __len__(self):
+        return self.data['anchor'].shape[0]
+    
+    def __getitem__(self, idx):
+        return {
+            "anchor" : self.data['anchor'][idx],
+            "target_batch" : self.data['target_batch'][idx]
+        }
 
 # test functionality
 if __name__ == '__main__':
     dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
                                     '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
                                     'en-es.csv')
-    source, target = dataset[0]
-    print(source.shape)
-    print(target.shape)
+    
+    dataset_list = list()
+    # save the dataset
+    for i in range(len(dataset)):
+        dataset_list.append(dataset[i])
+
+    # each element of dataset_list is a dictionary, we need to concat the torch tensors
+    dataset_dict = convert_dict_of_tensors_to_list(stack_dicts(dataset_list))
+    save_to_json(dataset_dict, 'en-es.json')

@@ -44,9 +44,7 @@ if __name__ == "__main__":
 
     # initialize model and dataset loader
     model = SourceTargetDPR(inpt_embd_size, outpt_embd_size)
-    dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
-                                    '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
-                                    'en-es.csv')
+    dataset = ProcessedPairedTextDataset('en-es.json')
     dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
 
     train(model, dataloader)

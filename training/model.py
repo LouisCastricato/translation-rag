@@ -44,4 +44,4 @@ class SourceTargetDPR(torch.nn.Module):
         x: a tuple of batched source and target language embeddings
         :return: a tuple of batched source and target language embeddings, post projection
         """
-        return self.source_encoder(x[0]), self.target_encoder(x[1])
+        return self.source_encoder(x["anchor"]), self.target_encoder(x["target_batch"])
