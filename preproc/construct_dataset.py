@@ -3,7 +3,7 @@ from numpy import random
 import sys
 
 sys.path.append('.')
-from data_utils import *
+from data_utils import list_to_dict, load_space_delimited, save_dict
 
 
 

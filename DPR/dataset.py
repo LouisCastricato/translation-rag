@@ -24,7 +24,7 @@ class FastTextDataset(torch.utils.data.Dataset):
         """
         Returns a random word from the dataset
         """
-        return self.keys[random.randint(0, len(self.keys))]
+        return self.keys[random.randint(0, len(self.keys) - 1)]
     def get_vector(self, word):
         """
         Returns a single word vector
@@ -99,7 +99,7 @@ class ProcessedPairedTextDataset(torch.utils.data.Dataset):
 if __name__ == '__main__':
     dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
                                     '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
-                                    'en-es.csv')
+                                    'rag-processed-datasets/en-es.csv')
     
     dataset_list = list()
     # save the dataset
@@ -108,4 +108,15 @@ if __name__ == '__main__':
 
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
     dataset_dict = convert_dict_of_tensors_to_list(stack_dicts(dataset_list))
-    save_to_json(dataset_dict, 'en-es.json')
+    #save_to_json(dataset_dict, 'en-es.json')
+
+
+    # save a copy of only the anchors, which we will use in the embedding layer
+    for idx, elem in enumerate(dataset_list):
+        dataset_list[idx] = {
+            dataset.pair_dataset[idx] : elem['anchor'].numpy().tolist()}
+        
+    # each element of dataset_list is a dictionary, we need to concat the torch tensors
+    dataset_dict = stack_dicts(dataset_list)
+    save_to_json(dataset_dict, 'embeddings.json')
+
