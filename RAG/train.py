@@ -20,7 +20,7 @@ def train(model, dataset_loader, epochs=10):
             optim.step()
             optim.zero_grad()
 
-        # update tqdm bar every batch with the loss
+        # update tqdm bar every epoch with the loss
         pbar.set_description(f"loss: {loss_value}")
 
 if __name__ == "__main__":
