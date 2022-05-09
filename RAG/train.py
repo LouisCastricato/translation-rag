@@ -44,15 +44,22 @@ if __name__ == "__main__":
 
 
     # initialize model and dataset loader
-    model = DecoupledRAG(index_dir, embeddings_dir, inpt_embd_size)
-    dataset = RAGDataset('rag-processed-datasets/en-de.csv')
-    dataloader = DataLoader(dataset, batch_size=10, shuffle=False)
+    model = DecoupledRAG(index_dir, embeddings_dir)
+    
+    dataset_train = RAGDataset('rag-processed-datasets/en-de.csv')
+    dataloader = DataLoader(dataset_train, batch_size=10, shuffle=False)
+
+    # load the DPR model
+    model.dpr.load_state_dict(torch.load('DPR_encoder.pt'))
 
     # compute a forward pass
+    for data in dataloader:
+        print(model(data))
+        import sys
+        sys.exit()
     with torch.no_grad():
-        print(model(dataset[0]))
+        print(dataset_train[:10])
+        print(model(dataset_train[:10]))
 
     #train(model, dataloader)
 
-    # save the model
-    torch.save(model.state_dict(), 'model.pt')

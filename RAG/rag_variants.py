@@ -4,8 +4,12 @@ from typing import Iterable, Dict, Union, Tuple, Any
 
 # Decoupled RAG returns 0 for the coupling loss, since (duh) its decoupled.
 class DecoupledRAG(BaseRAG):
-    def __init__(self, index_dir : str = None, embd_size : int = 300, dropout : float = 0.1):
-        super(DecoupledRAG, self).__init__(index_dir, embd_size, dropout)
+    def __init__(
+        self, 
+        index_dir : str = None, 
+        embedding_dir = None):
+
+        super(DecoupledRAG, self).__init__(index_dir, embedding_dir)
 
     def coupling_loss(self, x : Dict, model_output : Union[Tuple, Any], **kwargs):
         """

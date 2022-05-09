@@ -37,7 +37,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     word_pairings = load_space_delimited('en-es.csv')
 
-    model.load_state_dict(torch.load('model.pt'))
+    model.load_state_dict(torch.load('DPR_encoder.pt'))
 
     embeddings = embed(model, dataloader, word_pairings)
 
