@@ -33,9 +33,9 @@ def embed(model : SourceTargetDPR, dataset : DataLoader, paired_words : Iterable
 
 if __name__ == "__main__":
     model = SourceTargetDPR(300, 300, dropout=0.0)
-    dataset = ProcessedPairedTextDataset('en-es.json')
+    dataset = ProcessedPairedTextDataset('rag-processed-datasets/index-vocab/en-es.json')
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
-    word_pairings = load_space_delimited('en-es.csv')
+    word_pairings = load_space_delimited('rag-processed-datasets/en-es.csv')
 
     model.load_state_dict(torch.load('DPR_encoder.pt'))
 
@@ -47,4 +47,4 @@ if __name__ == "__main__":
     # index the embeddings we just computed 
     index.index_data(embeddings)
     # save to disk
-    index.serialize('en-es')
+    index.serialize('rag-processed-datasets/index-vocab/en-es')

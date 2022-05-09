@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # initialize model and dataset loader
     model = SourceTargetDPR(inpt_embd_size, outpt_embd_size, dropout=0.0)
     dataset = ProcessedPairedTextDataset('rag-processed-datasets/index-vocab/en-es.json')
-    dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
 
     train(model, dataloader)
 

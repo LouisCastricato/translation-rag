@@ -81,9 +81,7 @@ class BaseRAG(torch.nn.Module):
 
         # if we have a list of query words
         if type(x['query_word']) == list:
-            print(x['query_word'])
             query_embedding = torch.stack(list(map(lambda x: self.embedding_layer[x], x['query_word']))).squeeze()
-            print(query_embedding.shape)
             query_embedding = self.dpr.source_encoder(query_embedding)
         else:
             query_embedding = self.dpr.source_encoder(self.embedding_layer[x["query_word"]])
@@ -112,7 +110,7 @@ class BaseRAG(torch.nn.Module):
                     truncation=True,
                     return_tensors="pt") # ~ bs x 5
         
-    def forward(self, x : Dict):
+    def forward(self, x : Dict, debug : bool = False):
         """
         Forward pass of the model
         :param x: a dictionary containing atleast the following keys:
@@ -145,13 +143,19 @@ class BaseRAG(torch.nn.Module):
 
         # compute RAG's coupling loss
         coupling_loss = self.coupling_loss(x, model_output)
-
-        return {
-            "Loss/Total": model_output.loss + coupling_loss,
-            "Loss/Autoregressive": model_output.loss,
-            "Loss/Coupling": coupling_loss,
-            "query_word" : [x["query_word"]],
-            "source_word": source_word,
-            "target_word": [x["target_word"]],
-        }
+        if debug:
+            return {
+                "Loss/Total": model_output.loss + coupling_loss,
+                "Loss/Autoregressive": model_output.loss,
+                "Loss/Coupling": coupling_loss,
+                "query_word" : [x["query_word"]],
+                "source_word": source_word,
+                "target_word": [x["target_word"]],
+            }
+        else:
+            return {
+                "Loss/Total": model_output.loss + coupling_loss,
+                "Loss/Autoregressive": model_output.loss,
+                "Loss/Coupling": coupling_loss
+            }
 
