@@ -9,10 +9,10 @@ from numpy.random import choice
 sys.path.append('.')
 from data_utils import *
 from DPR.dataset import *
-from indexing.faiss_index import DenseFlatIndexer
+from indexing.faiss_utils import DenseFlatIndexer
 
 class RAGDataset(torch.utils.data.Dataset):
-    def __init__(self, pairing_directory, faiss_directory):
+    def __init__(self, pairing_directory):
         self.pair_dataset = load_space_delimited(pairing_directory)
 
     def __len__(self):

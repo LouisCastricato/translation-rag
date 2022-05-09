@@ -1,5 +1,9 @@
+import sys
 import torch
 from torch import nn
+
+sys.path.append('.')
+from data_utils import load_json
 
 # implements a single layer DPR model
 class SingeLayerDPR(torch.nn.Module):

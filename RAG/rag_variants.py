@@ -1,14 +1,13 @@
 from model import BaseRAG
-from typing import Iterable, Dict, Union, Tuple
-from transformers.modeling_output import Seq2SeqLMOutput
+from typing import Iterable, Dict, Union, Tuple, Any
 
 
 # Decoupled RAG returns 0 for the coupling loss, since (duh) its decoupled.
 class DecoupledRAG(BaseRAG):
-    def __init__(self, index_dir : str = None, embd_size : int, dropout : float = 0.1):
+    def __init__(self, index_dir : str = None, embd_size : int = 300, dropout : float = 0.1):
         super(DecoupledRAG, self).__init__(index_dir, embd_size, dropout)
 
-    def coupling_loss(self, x : Dict, model_output : Union[Tuple, Seq2SeqLMOutput], **kwargs):
+    def coupling_loss(self, x : Dict, model_output : Union[Tuple, Any], **kwargs):
         """
         Computes the coupling loss for the query embedding model
         :param x: a dictionary containing atleast the following keys:

@@ -114,7 +114,7 @@ if __name__ == '__main__':
     # save a copy of only the anchors, which we will use in the embedding layer
     for idx, elem in enumerate(dataset_list):
         dataset_list[idx] = {
-            dataset.pair_dataset[idx] : elem['anchor'].numpy().tolist()}
+            dataset.pair_dataset[idx][0] : elem['anchor'].numpy().tolist()}
         
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
     dataset_dict = stack_dicts(dataset_list)

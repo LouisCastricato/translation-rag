@@ -58,8 +58,8 @@ class DenseIndexer(object):
             index_file = os.path.join(path, "index.dpr")
             meta_file = os.path.join(path, "index_meta.dpr")
         else:
-            index_file = path + ".{}.dpr".format(self.get_index_name())
-            meta_file = path + ".{}_meta.dpr".format(self.get_index_name())
+            index_file = path + ".index.dpr"
+            meta_file = path + ".index_meta.dpr"
         return index_file, meta_file
 
     def index_exists(self, path: str):

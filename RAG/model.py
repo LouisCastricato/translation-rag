@@ -2,15 +2,15 @@
 
 import torch
 import sys
-from typing import Iterable, Dict, Union, Tuple
+from typing import Iterable, Dict, Union, Tuple, Any
 from transformers import BartTokenizer, BartConfig, BartForConditionalGeneration
-from transformers.modeling_output import Seq2SeqLMOutput
 
 sys.path.append('.')
-from DPR.model import SourceTargetDPR
+from DPR.model import SourceTargetDPR, EmbeddingLayer
+from indexing.faiss_utils import DenseFlatIndexer
 
 class BaseRAG(torch.nn.Module):
-    def __init__(self, index_dir : str = None, embd_size : int, dropout : float = 0.1):
+    def __init__(self, index_dir : str = None, embedding_dir = None, embd_size : int = 300, dropout : float = 0.1):
         super(BaseRAG, self).__init__()
         """
         :param index_dir: the directory of the FAISS index + embedding dictionary
@@ -18,15 +18,17 @@ class BaseRAG(torch.nn.Module):
         :param dropout: the dropout rate
         """
         self.index_dir = index_dir
-        self.embedding_dir = index_dir + '/embeddings.json'
-        self.embedding_layer = EmbeddingLayer(embedding_dir)
-        print("Embedding layer loaded.")
+        self.embedding_dir = embedding_dir
 
-        # initialize faiss index
+        # initialize the FAISS index
         self.faiss = DenseFlatIndexer()
-        self.fass.init_index(300)
-        self.faiss.deserialize(index_dir)
+        self.faiss.init_index(300)
+        self.faiss.deserialize(self.index_dir)
         print("FAISS index loaded.")
+
+        # initialize the embedding layer
+        self.embedding_layer = EmbeddingLayer(self.embedding_dir)
+        print("Embedding layer loaded.")
 
         # initalize DPR
         self.dpr = SourceTargetDPR(embd_size, embd_size, dropout)
@@ -36,15 +38,17 @@ class BaseRAG(torch.nn.Module):
             encoder_layers=2, 
             decoder_layers=2, 
             d_model=embd_size, 
-            dropout=dropout)
+            dropout=dropout,
+            encoder_attention_heads=10,
+            decoder_attention_heads=10)
 
-        self.language_model = GPT2LMHeadModel(lm_config)
-        self.tokenizer = BartTokenizer.from_pretrained('bart-large')
+        self.language_model = BartForConditionalGeneration(self.lm_config)
+        self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
         print("Model initialized.")
 
         self.embd_size = embd_size
     
-    def coupling_loss(self, x : Dict, model_output : Union[Tuple, Seq2SeqLMOutput], **kwargs):
+    def coupling_loss(self, x : Dict, model_output : Union[Tuple, Any], **kwargs):
         """
         Computes the coupling loss for the query embedding model
         :param x: a dictionary containing atleast the following keys:
