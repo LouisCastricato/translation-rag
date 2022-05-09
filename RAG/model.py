@@ -47,7 +47,8 @@ class BaseRAG(torch.nn.Module):
             d_model=embd_size, 
             dropout=dropout,
             encoder_attention_heads=10,
-            decoder_attention_heads=10)
+            decoder_attention_heads=10,
+            reduce
 
         self.language_model = BartForConditionalGeneration(self.lm_config)
         self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
@@ -55,7 +56,12 @@ class BaseRAG(torch.nn.Module):
 
         self.embd_size = embd_size
     
-    def coupling_loss(self, x : Dict, model_output : Union[Tuple, Any], **kwargs):
+    def coupling_loss(self, 
+        x : Dict, 
+        model_output : Union[Tuple, Any], 
+        query_embedding : torch.tensor,
+        source_embedding : torch.tensor,
+        **kwargs):
         """
         Computes the coupling loss for the query embedding model
         :param x: a dictionary containing atleast the following keys:
@@ -63,11 +69,14 @@ class BaseRAG(torch.nn.Module):
         'source_word': sequence of source words,
         'target_word': sequence of target words}
         :param model_output: the output of the language model
+        :param query_embedding: the query embedding
+        :param source_embedding: the source document embedding
+        :param k: the number of documents
         :return: the loss
         """
         raise NotImplementedError
 
-    def query(self, x : Dict, k : int = 1):
+    def query(self, x : Dict, k : int = 5):
         """
         Queries against a FAISS index by first embedding query and then querying the index
         :param x: a dictionary containing atleast the following keys:
@@ -90,7 +99,9 @@ class BaseRAG(torch.nn.Module):
         search_results = self.faiss.search_knn(query_embedding.detach().cpu().numpy(), k)
 
         return {
-            'source_word_id': search_results,
+            'source_word_id': list(map(lambda x: x[0], search_results)),
+            'source_scores' : list(map(lambda x: x[1], search_results)),
+            'source_word_embedding': list(map(lambda x: x[2], search_results)),
             'query_embedding': query_embedding
         }
 
@@ -110,7 +121,7 @@ class BaseRAG(torch.nn.Module):
                     truncation=True,
                     return_tensors="pt") # ~ bs x 5
         
-    def forward(self, x : Dict, debug : bool = False):
+    def forward(self, x : Dict, k : int = 5, debug : bool = False):
         """
         Forward pass of the model
         :param x: a dictionary containing atleast the following keys:
@@ -121,10 +132,12 @@ class BaseRAG(torch.nn.Module):
         inpt_word = self.tokenize(x["query_word"]) # ~ bs x 5
 
         # run the query
-        query_results = self.query(x)
+        query_results = self.query(x, k)
 
         # get the source ids and embeddings for each query.
         source_word = list(flatten(query_results['source_word_id']))
+        source_word_embedding = torch.tensor(query_results['source_word_embedding'])
+
         query_embedding = query_results['query_embedding']
 
         # get our source_ids and label_ids
@@ -135,14 +148,28 @@ class BaseRAG(torch.nn.Module):
         else:
             label_ids = self.tokenize(x["target_word"])
 
+        # if k > 1, interleave the label_ids
+        label_input_ids = label_ids.input_ids
+        if k > 1: 
+            # we need to reshape the labels and source+query embeddings.
+            label_input_ids = label_input_ids.unsqueeze(1).repeat(1, k, 1)
+            label_input_ids = label_input_ids.view(-1, label_input_ids.shape[-1])
+
+            source_word_embedding = source_word_embedding.unsqueeze(1).repeat(1, k, 1)
+            query_embedding = query_embedding.unsqueeze(1).repeat(1, k, 1)
+
         # run a forward pass on BART, record loss
         model_output = self.language_model(
             input_ids=source_ids.input_ids,
             attention_mask=source_ids.attention_mask, 
-            labels=label_ids.input_ids)
+            labels=label_input_ids)
 
         # compute RAG's coupling loss
-        coupling_loss = self.coupling_loss(x, model_output)
+        coupling_loss = self.coupling_loss(x, model_output, query_embedding, source_word_embedding)
+       
+        print(coupling_loss)
+        import sys
+        sys.exit()       
         if debug:
             return {
                 "Loss/Total": model_output.loss + coupling_loss,

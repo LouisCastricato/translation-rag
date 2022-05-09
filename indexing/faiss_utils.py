@@ -26,6 +26,8 @@ class DenseIndexer(object):
         self.buffer_size = buffer_size
         self.index_id_to_db_id = []
         self.index = None
+        self.data_copy = None
+
 
     def init_index(self, vector_sz: int):
         raise NotImplementedError
@@ -52,6 +54,7 @@ class DenseIndexer(object):
         faiss.write_index(self.index, index_file)
         with open(meta_file, mode="wb") as f:
             pickle.dump(self.index_id_to_db_id, f)
+        np.save(file + "-index-data-copy.npy", self.data_copy)
 
     def get_files(self, path: str):
         if os.path.isdir(path):
@@ -78,6 +81,7 @@ class DenseIndexer(object):
         assert (
             len(self.index_id_to_db_id) == self.index.ntotal
         ), "Deserialized index_id_to_db_id should match faiss index size"
+        self.data_copy = np.load(path + "-index-data-copy.npy", allow_pickle=True)
 
     def _update_id_mapping(self, db_ids: List) -> int:
         self.index_id_to_db_id.extend(db_ids)
@@ -92,6 +96,7 @@ class DenseFlatIndexer(DenseIndexer):
         self.index = faiss.IndexFlatIP(vector_sz)
 
     def index_data(self, data: List[Tuple[object, np.array]]):
+        self.data_copy = data
         n = len(data)
         # indexing in batches is beneficial for many faiss index types
         for i in range(0, n, self.buffer_size):
@@ -105,12 +110,12 @@ class DenseFlatIndexer(DenseIndexer):
         indexed_cnt = len(self.index_id_to_db_id)
         logger.info("Total data indexed %d", indexed_cnt)
 
-    def search_knn(self, query_vectors: np.array, top_docs: int, return_only_ids : bool = True) -> List[Tuple[List[object], List[float]]]:
+    def search_knn(self, query_vectors: np.array, top_docs: int, return_only_ids : bool = False) -> List[Tuple[List[object], List[float]]]:
         scores, indexes = self.index.search(query_vectors, top_docs)
         # convert to external ids
         db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
         if not return_only_ids:
-            result = [(db_ids[i], scores[i]) for i in range(len(db_ids))]
+            result = [(db_ids[i], scores[i], self.data_copy[i][1]) for i in range(len(db_ids))]
         else:
             result = db_ids
         return result
