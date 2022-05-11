@@ -85,7 +85,9 @@ class SequenceMarginalizedRAG(BaseRAG):
             doc_logits[i] = margin_dist[i, idx] 
 
         doc_logprobs = F.log_softmax(doc_logits.view(bs, k), dim=-1).view(-1)
-
+        print(doc_logprobs)
+        import sys
+        sys.exit()
         # combine the autoregressive logprobs and the doc_logprobs
         # we only want to utilize doc logits on the second token
         ar_logprobs = F.log_softmax(model_output.logits, dim=-1)
@@ -93,8 +95,6 @@ class SequenceMarginalizedRAG(BaseRAG):
         first_token_scores = ar_logprobs[:, 0, :].unsqueeze(1)
         second_token_scores = ar_logprobs[:, 1, :]
         remainder = ar_logprobs[:, 2:, :]
-
-
         
         second_token_scores = (second_token_scores + doc_logprobs.unsqueeze(1)).unsqueeze(1)
         rag_logprobs = torch.cat([first_token_scores, second_token_scores, remainder], dim=1)
