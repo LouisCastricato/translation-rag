@@ -108,10 +108,10 @@ class BaseRAG(torch.nn.Module):
 
         # if we have a list of query words
         if type(x['query_word']) == list:
-            query_embedding = torch.stack(list(map(lambda x: self.embedding_layer[x], x['query_word']))).squeeze()
+            query_embedding = torch.stack(list(map(lambda x: self.embedding_layer[x], x['query_word']))).squeeze().cuda()
             query_embedding = self.dpr.source_encoder(query_embedding)
         else:
-            query_embedding = self.dpr.source_encoder(self.embedding_layer[x["query_word"]])
+            query_embedding = self.dpr.source_encoder(self.embedding_layer[x["query_word"]]).cuda()
 
         # get top-k results for our query.
         search_results = self.faiss.search_knn(query_embedding.detach().cpu().numpy(), k)
@@ -148,14 +148,12 @@ class BaseRAG(torch.nn.Module):
         'target_word': sequence of target words}
         :return: generative_loss + coupling loss
         """
-        inpt_word = self.tokenize(x["query_word"]) # ~ bs x 5
-
         # run the query
         query_results = self.query(x, k)
 
         # get the source ids and embeddings for each query.
         source_word = list(flatten(query_results['source_word_id']))
-        source_word_embedding = torch.tensor(query_results['source_word_embedding'])
+        source_word_embedding = torch.tensor(query_results['source_word_embedding']).cuda()
 
         query_embedding = query_results['query_embedding']
 
@@ -168,7 +166,7 @@ class BaseRAG(torch.nn.Module):
             label_ids = self.tokenize(x["target_word"])
 
         # if k > 1, interleave the label_ids
-        label_input_ids = label_ids.input_ids
+        label_input_ids = label_ids.input_ids.cuda()
         if k > 1: 
             # we need to reshape the labels and query embeddings.
             label_input_ids = label_input_ids.unsqueeze(1).repeat(1, k, 1)
@@ -178,8 +176,8 @@ class BaseRAG(torch.nn.Module):
 
         # run a forward pass on BART, record loss
         model_output = self.language_model(
-            input_ids=source_ids.input_ids,
-            attention_mask=source_ids.attention_mask)
+            input_ids=source_ids.input_ids.cuda(),
+            attention_mask=source_ids.attention_mask.cuda())
         #autoregressive_loss = self.autoregressive_loss(model_output, label_input_ids)
         
         # compute RAG's coupling loss

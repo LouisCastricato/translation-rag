@@ -65,8 +65,8 @@ class SequenceMarginalizedRAG(BaseRAG):
         bs, k, embd_size = query_embedding.shape
 
         # resize query and source embedding to (-1, embd_size)
-        query_embedding = query_embedding.view(-1, embd_size)
-        source_embedding = source_embedding.view(-1, embd_size)
+        query_embedding = query_embedding.view(-1, embd_size).cuda()
+        source_embedding = source_embedding.view(-1, embd_size).cuda()
 
         # generate the indices 
         indices = torch.arange(k).to(query_embedding)
@@ -80,7 +80,7 @@ class SequenceMarginalizedRAG(BaseRAG):
 
         # retrieve the corresponding logits
         # TODO: Verify that this is correct + speed up
-        doc_logits = torch.zeros((bs * k))
+        doc_logits = torch.zeros((bs * k)).cuda()
         for i, idx in enumerate(indices):
             doc_logits[i] = margin_dist[i, idx] 
 
@@ -94,6 +94,8 @@ class SequenceMarginalizedRAG(BaseRAG):
         second_token_scores = ar_logprobs[:, 1, :]
         remainder = ar_logprobs[:, 2:, :]
 
+
+        
         second_token_scores = (second_token_scores + doc_logprobs.unsqueeze(1)).unsqueeze(1)
         rag_logprobs = torch.cat([first_token_scores, second_token_scores, remainder], dim=1)
 

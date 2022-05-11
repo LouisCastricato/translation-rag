@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
 
     # initialize model and dataset loader
-    model = SequenceMarginalizedRAG(index_dir, embeddings_dir)
+    model = SequenceMarginalizedRAG(index_dir, embeddings_dir).cuda()
     
     dataset_train = RAGDataset('rag-processed-datasets/en-de.csv')
     dataloader = DataLoader(dataset_train, batch_size=10, shuffle=False)
