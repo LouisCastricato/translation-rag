@@ -111,11 +111,15 @@ class DenseFlatIndexer(DenseIndexer):
         logger.info("Total data indexed %d", indexed_cnt)
 
     def search_knn(self, query_vectors: np.array, top_docs: int, return_only_ids : bool = False) -> List[Tuple[List[object], List[float]]]:
+        
         scores, indexes = self.index.search(query_vectors, top_docs)
+        
         # convert to external ids
         db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
+        vectors = [[self.data_copy[i][1] for i in query_top_idxs] for query_top_idxs in indexes]
+
         if not return_only_ids:
-            result = [(db_ids[i], scores[i], self.data_copy[i][1]) for i in range(len(db_ids))]
+            result = [(db_ids[i], scores[i], vectors[i]) for i in range(len(db_ids))]
         else:
             result = db_ids
         return result

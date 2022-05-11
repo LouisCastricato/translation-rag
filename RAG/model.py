@@ -1,7 +1,9 @@
 # implements a very basic RAG model for experimentation
 
+from functools import partial
 from more_itertools import flatten
 import torch
+import torch.nn.functional as F
 import sys
 from typing import Iterable, Dict, Union, Tuple, Any
 from transformers import BartTokenizer, BartConfig, BartForConditionalGeneration
@@ -9,6 +11,7 @@ from transformers import BartTokenizer, BartConfig, BartForConditionalGeneration
 sys.path.append('.')
 from DPR.model import SourceTargetDPR, EmbeddingLayer
 from indexing.faiss_utils import DenseFlatIndexer
+from data_utils import stack_dicts
 
 class BaseRAG(torch.nn.Module):
     def __init__(
@@ -47,8 +50,7 @@ class BaseRAG(torch.nn.Module):
             d_model=embd_size, 
             dropout=dropout,
             encoder_attention_heads=10,
-            decoder_attention_heads=10,
-            reduce
+            decoder_attention_heads=10)
 
         self.language_model = BartForConditionalGeneration(self.lm_config)
         self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
@@ -61,7 +63,8 @@ class BaseRAG(torch.nn.Module):
         model_output : Union[Tuple, Any], 
         query_embedding : torch.tensor,
         source_embedding : torch.tensor,
-        **kwargs):
+        labels : torch.tensor,
+        **kwargs) -> torch.tensor:
         """
         Computes the coupling loss for the query embedding model
         :param x: a dictionary containing atleast the following keys:
@@ -71,10 +74,25 @@ class BaseRAG(torch.nn.Module):
         :param model_output: the output of the language model
         :param query_embedding: the query embedding
         :param source_embedding: the source document embedding
-        :param k: the number of documents
+        :param labels: the labels
         :return: the loss
         """
         raise NotImplementedError
+
+    def autoregressive_loss(self, 
+        logprobs : torch.tensor, 
+        labels : torch.tensor,
+        reduction : str = 'none',
+        **kwargs) -> torch.tensor:
+        """
+        Computes the autoregressive loss
+        :param logprobs: the log probabilities
+        :param labels: the labels
+        :param reduction: the reduction method
+        :return: the loss
+        """
+        bs, seq_len, vocab_size = logprobs.shape
+        return F.cross_entropy(logprobs.view(-1, vocab_size), labels.view(-1), reduction=reduction)
 
     def query(self, x : Dict, k : int = 5):
         """
@@ -120,7 +138,8 @@ class BaseRAG(torch.nn.Module):
                     max_length=5,
                     truncation=True,
                     return_tensors="pt") # ~ bs x 5
-        
+
+
     def forward(self, x : Dict, k : int = 5, debug : bool = False):
         """
         Forward pass of the model
@@ -151,38 +170,35 @@ class BaseRAG(torch.nn.Module):
         # if k > 1, interleave the label_ids
         label_input_ids = label_ids.input_ids
         if k > 1: 
-            # we need to reshape the labels and source+query embeddings.
+            # we need to reshape the labels and query embeddings.
             label_input_ids = label_input_ids.unsqueeze(1).repeat(1, k, 1)
             label_input_ids = label_input_ids.view(-1, label_input_ids.shape[-1])
 
-            source_word_embedding = source_word_embedding.unsqueeze(1).repeat(1, k, 1)
             query_embedding = query_embedding.unsqueeze(1).repeat(1, k, 1)
 
         # run a forward pass on BART, record loss
         model_output = self.language_model(
             input_ids=source_ids.input_ids,
-            attention_mask=source_ids.attention_mask, 
-            labels=label_input_ids)
-
+            attention_mask=source_ids.attention_mask)
+        #autoregressive_loss = self.autoregressive_loss(model_output, label_input_ids)
+        
         # compute RAG's coupling loss
-        coupling_loss = self.coupling_loss(x, model_output, query_embedding, source_word_embedding)
-       
-        print(coupling_loss)
-        import sys
-        sys.exit()       
+        coupling_loss = self.coupling_loss(
+            x, 
+            model_output,
+            query_embedding, 
+            source_word_embedding, 
+            label_input_ids)
+
         if debug:
             return {
-                "Loss/Total": model_output.loss + coupling_loss,
-                "Loss/Autoregressive": model_output.loss,
-                "Loss/Coupling": coupling_loss,
+                "Loss": coupling_loss,
                 "query_word" : [x["query_word"]],
                 "source_word": source_word,
                 "target_word": [x["target_word"]],
             }
         else:
             return {
-                "Loss/Total": model_output.loss + coupling_loss,
-                "Loss/Autoregressive": model_output.loss,
-                "Loss/Coupling": coupling_loss
+                "Loss": coupling_loss,
             }
 

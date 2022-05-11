@@ -17,6 +17,7 @@ class DecoupledRAG(BaseRAG):
         model_output : Union[Tuple, Any], 
         query_embedding : torch.tensor,
         source_embedding : torch.tensor, 
+        labels : torch.tensor,
         **kwargs):
         """
         Computes the coupling loss for the query embedding model
@@ -27,24 +28,26 @@ class DecoupledRAG(BaseRAG):
         :param model_output: the output of the language model
         :param query_embedding: the query embedding
         :param source_embedding: the source document embedding
+        :param labels: the labels
         :return: the loss
         """
         return 0
 
 # This is the standard RAG implementation that uses a marginalized NLL loss.
-class MarginalizedRAG(BaseRAG):
+class SequenceMarginalizedRAG(BaseRAG):
     def __init__(
         self, 
         index_dir : str = None, 
         embedding_dir = None):
 
-        super(MarginalizedRAG, self).__init__(index_dir, embedding_dir)
+        super(SequenceMarginalizedRAG, self).__init__(index_dir, embedding_dir)
 
     def coupling_loss(self, 
         x : Dict, 
         model_output : Union[Tuple, Any], 
         query_embedding : torch.tensor, 
         source_embedding : torch.tensor,
+        labels : torch.tensor,
         **kwargs):
         """
         Computes the coupling loss for the query embedding model
@@ -55,6 +58,7 @@ class MarginalizedRAG(BaseRAG):
         :param model_output: the output of the language model
         :param query_embedding: the query embedding
         :param source_embedding: the source document embedding
+        :param ar_loss: the non-reduced autoregressive loss
         :return: the loss
         """
         # get the number of documents 
@@ -72,19 +76,25 @@ class MarginalizedRAG(BaseRAG):
         indices = indices.view(-1).long()
 
         # compute the marginal distribution 
-        margin_dist = F.softmax(query_embedding @ source_embedding.t(), dim=1)
+        margin_dist = query_embedding @ source_embedding.t()
 
         # retrieve the corresponding logits
-        logits = torch.zeros((bs * k))
+        # TODO: Verify that this is correct + speed up
+        doc_logits = torch.zeros((bs * k))
         for i, idx in enumerate(indices):
-            logits[idx] = margin_dist[i, idx]
+            doc_logits[i] = margin_dist[i, idx] 
 
-        #logits = margin_dist[:, indices]
-        print(logits)
+        doc_logprobs = F.log_softmax(doc_logits.view(bs, k), dim=-1).view(-1)
 
-        print(query_embedding.shape)
-        print(source_embedding.shape)
+        # combine the autoregressive logprobs and the doc_logprobs
+        # we only want to utilize doc logits on the second token
+        ar_logprobs = F.log_softmax(model_output.logits, dim=-1)
 
-        print(margin_dist.shape)
-        return 0
+        first_token_scores = ar_logprobs[:, 0, :].unsqueeze(1)
+        second_token_scores = ar_logprobs[:, 1, :]
+        remainder = ar_logprobs[:, 2:, :]
 
+        second_token_scores = (second_token_scores + doc_logprobs.unsqueeze(1)).unsqueeze(1)
+        rag_logprobs = torch.cat([first_token_scores, second_token_scores, remainder], dim=1)
+
+        return self.autoregressive_loss(rag_logprobs, labels, reduction='mean')

@@ -15,7 +15,7 @@ def train(model, dataset_loader, epochs=10):
             model_output =  model(batch)
 
             # loss and backwards step
-            loss_value = model_output['Loss/Total']
+            loss_value = model_output['Loss']
             loss_value.backward()
             optim.step()
             optim.zero_grad()
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
 
     # initialize model and dataset loader
-    model = MarginalizedRAG(index_dir, embeddings_dir)
+    model = SequenceMarginalizedRAG(index_dir, embeddings_dir)
     
     dataset_train = RAGDataset('rag-processed-datasets/en-de.csv')
     dataloader = DataLoader(dataset_train, batch_size=10, shuffle=False)
