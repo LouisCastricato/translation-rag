@@ -4,7 +4,7 @@ from modalcollapse.utils import *
 from modalcollapse.indexing.faiss_utils import singular_value_plot_faiss, batch
 from tqdm import tqdm
 from functools import partial 
-
+import matplotlib.pyplot as plt
 # this function takes a list of datasets and produces local SVD plots for each
 def get_intrinsic_dimension_plot(datasets):
     batched = batch(datasets)
@@ -26,30 +26,35 @@ def get_intrinsic_dimension_auc(datasets):
     svl = np.asarray(get_intrinsic_dimension_plot(datasets), dtype=np.float64)
 
     # semilogy and abs
-    svl[svl < 0] = 0
-    svl = np.abs(np.log(svl))
+    svl = np.log10(svl)
 
     # replace all -infs and NaNs with 0
     svl[np.isinf(svl)] = 0
     svl[np.isnan(svl)] = 0
+    svl[svl < 0] = 0
 
     # for each set of svl curves find the minimum
     def get_min_svl(x):
-        return [(np.min(s, axis=0)) for s in x]
+        return np.min(x, axis=0)
+
+    # for each set of svl curves find the maximum
+    def get_max_svl(x):
+        return np.max(x, axis=0)
 
     # get min_svl for each dataset
     min_svl = np.array(list(map(get_min_svl, svl)))
+    max_svl = np.array(list(map(get_max_svl, svl)))
 
     # for each graph in min_svl, integrate
-    return list(map(np.trapz, min_svl))
+    return list(map(np.trapz, min_svl)), list(map(np.trapz, max_svl))
 
 # test functionality
 if __name__ == "__main__":
-    mean = [0.] * 20
-    cov = np.eye(20)
+    mean = [0.] * 512
+    cov = np.eye(512)
 
     # generate a list of 2 randomly initialized numpy arrays
-    datasets = [get_splooch_points(set_size=50000, dim=20) for _ in range(2)]
+    datasets = [get_splooch_points(set_size=50000, dim=512) for _ in range(2)]
     datasets2 = [np.random.multivariate_normal(mean, cov, size=50000)]
 
     datasets += datasets2
