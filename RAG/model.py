@@ -10,6 +10,7 @@ from transformers import BartTokenizer, BartConfig, BartForConditionalGeneration
 
 sys.path.append('.')
 from DPR.model import SourceTargetDPR, EmbeddingLayer
+from RAG.visualization_util import get_intrinsic_dimension_auc
 from indexing.faiss_utils import DenseFlatIndexer
 from data_utils import stack_dicts
 
@@ -123,6 +124,15 @@ class BaseRAG(torch.nn.Module):
             'query_embedding': query_embedding
         }
 
+    def get_intrisinc_collapse(self, validation_set : Iterable[str]) -> float:
+        """
+        Computes the intrinsic collapse for the validation set
+        :param validation_set: the validation set
+        :return: the intrinsic collapse
+        """
+        # for each string in the validation set, embed using the query encoder
+        
+        return get_intrinsic_dimension_auc(validation_set)
 
 
     def tokenize(self, sequence : Iterable[str], max_length : int = 5):

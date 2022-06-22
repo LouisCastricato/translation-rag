@@ -133,3 +133,5 @@ get_data.sh
 *.dpr
 *.json
 *.pt 
+*.npy
+*.png 

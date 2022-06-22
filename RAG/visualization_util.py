@@ -54,7 +54,7 @@ if __name__ == "__main__":
     cov = np.eye(512)
 
     # generate a list of 2 randomly initialized numpy arrays
-    datasets = [get_splooch_points(set_size=50000, dim=512) for _ in range(2)]
+    datasets = [get_splooch_points(set_size=50000, dim=512, splooches=100) for _ in range(2)]
     datasets2 = [np.random.multivariate_normal(mean, cov, size=50000)]
 
     datasets += datasets2
