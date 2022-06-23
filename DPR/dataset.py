@@ -6,7 +6,6 @@ from gensim.test.utils import datapath
 import random
 from numpy.random import choice
 import numpy as np
-from modalcollapse.dataset_generation import generate_a_random_rotation_matrix
 
 sys.path.append('.')
 from data_utils import *
@@ -52,31 +51,11 @@ class PairedFastTextDataset(torch.utils.data.Dataset):
         """
         source_word, target_word = self.pair_dataset[index]
         anchor = torch.tensor(self.source_dataset.get_vector(source_word))
-        positive = self.target_dataset.get_vector(target_word)
-
-        # use 100 random samples from the target dataset
-        negative_samples = []
-        for i in range(100):
-            negative_samples.append(self.target_dataset.get_vector(self.target_dataset.get_random_key()))
-        
-        # use gold samples from other gold tuples
-        # first randomly sample pair_dataset - index
-        discrete_dist = list(range(len(self.pair_dataset)))
-        discrete_dist.remove(index)
-
-        sampled_gold = choice(discrete_dist, size=20)
-        for idx in sampled_gold:
-            negative_samples.append(self.target_dataset.get_vector(self.pair_dataset[idx][1]))
-
-        # concat the target embedding and the negative samples
-        positive = torch.tensor(positive).unsqueeze(1)
-        negative_samples = list(map(lambda x: torch.tensor(x).unsqueeze(1), negative_samples))
-        target_batch = torch.cat([positive] + negative_samples, dim=1)
-
+        positive = torch.tensor(self.target_dataset.get_vector(target_word))
 
         return {
             "anchor" : anchor.unsqueeze(0),
-            "target_batch" : torch.transpose(target_batch, 0, 1).unsqueeze(0)
+            "target" : positive.unsqueeze(0)
         }
 
 # takes the dataset produced by PairedFastTextDataset, to avoid processing time
@@ -94,25 +73,24 @@ class ProcessedPairedTextDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return {
             "anchor" : self.data['anchor'][idx],
-            "target_batch" : self.data['target_batch'][idx]
+            "target" : self.data['target'][idx]
         }
 
 class KnownDimensionalityDataset(torch.utils.data.Dataset):
     def __init__(self, suffix, base_dir = "../../known-intrinsic-dim/", is_val=False, val_split=0.9, seed=None):
 
-        self.source = np.float64(np.load(base_dir + "datasets_A/A_" + str(suffix) + ".npy"))
+        self.source = np.float32(np.load(base_dir + "datasets_A/A_" + str(suffix) + ".npy"))
 
         # generate a random rotation matrix to get the target
         # self.source is data_points x dim
         # rotation matrix is dim x dim
         if seed is not None:
             np.random.seed(seed)
-        rotation_matrix = generate_a_random_rotation_matrix(dim=self.source.shape[1])
-        self.target = np.matmul(self.source, rotation_matrix)
+            torch.manual_seed(seed)
 
-        #convert to float32
-        self.source = np.float32(self.source)
-        self.target = np.float32(self.target)
+        rotation_matrix = torch.nn.utils.parametrizations.orthogonal(torch.nn.Linear(self.source.shape[1], self.source.shape[1]))
+        with torch.no_grad():
+            self.target = rotation_matrix(torch.tensor(self.source)).numpy()
 
         if not is_val:
             self.source = self.source[:int(val_split * len(self.source))]
@@ -153,5 +131,5 @@ if __name__ == '__main__':
         
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
     dataset_dict = stack_dicts(dataset_list)
-    #save_to_json(dataset_dict, 'embeddings.json')
+    save_to_json(dataset_dict, 'embeddings.json')
 

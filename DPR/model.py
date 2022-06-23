@@ -17,9 +17,9 @@ class MultilayerDPR(torch.nn.Module):
 
         # Linear, ReLu, dropout
         self.l1 = nn.Linear(input_size, input_size)
-        self.l2 = nn.Linear(input_size, output_size)
+        self.l2 = nn.Linear(input_size, output_size, bias=False)
         self.dropout = nn.Dropout(dropout)
-
+        self.relu = nn.ReLU()
         self.input_size = input_size
         self.output_size = output_size
     
@@ -87,7 +87,8 @@ class SourceTargetDPR(torch.nn.Module):
                 target = torch.cat([target.unsqueeze(1)] * target.shape[0], dim=1).transpose(0,1)
 
         # normalize both anchor and target
-        #anchor = torch.nn.functional.normalize(anchor, p=2, dim=1)
-        #target = torch.nn.functional.normalize(target, p=2, dim=1)
+        if not duplicate:
+            anchor = torch.nn.functional.normalize(anchor, p=2, dim=1)
+            target = torch.nn.functional.normalize(target, p=2, dim=1)
 
         return anchor, target
