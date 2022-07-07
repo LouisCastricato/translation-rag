@@ -24,8 +24,8 @@ en_de_dict = {k: en_de_dict[k] for k in  key_intersection}
 en_es_dict = {k: en_es_dict[k] for k in  key_intersection}
 
 # save the first 97.5% as the training set
-en_es_training_length = int(len(en_es_dict)*0.60)
-en_de_training_length = int(len(en_de_dict)*0.60)
+en_es_training_length = int(len(en_es_dict)*0.9)
+en_de_training_length = int(len(en_de_dict)*0.9)
 
 save_dict(slice_dict_rhs(en_de_dict, en_de_training_length), 'DPR-input-data/en-de.train.csv')
 save_dict(slice_dict_rhs(en_es_dict, en_es_training_length), 'DPR-input-data/en-es.train.csv')

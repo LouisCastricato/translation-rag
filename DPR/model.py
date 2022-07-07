@@ -16,8 +16,8 @@ class MultilayerDPR(torch.nn.Module):
         super(MultilayerDPR, self).__init__()
 
         # Linear, ReLu, dropout
-        self.l1 = nn.Linear(input_size, input_size)
-        self.l2 = nn.Linear(input_size, output_size, bias=False)
+        self.l1 = nn.Linear(input_size, input_size//2)
+        self.l2 = nn.Linear(input_size//2, output_size)
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.input_size = input_size
@@ -29,7 +29,7 @@ class MultilayerDPR(torch.nn.Module):
         :return: the output embedding. Of size bs x output_size
         """
         # apply the linear layer then relu
-        return self.l2(x)
+        return self.l2(self.relu(self.l1(x)))
     
 class EmbeddingLayer:
     def __init__(self, dataset_dir):
@@ -68,27 +68,40 @@ class SourceTargetDPR(torch.nn.Module):
         :return: the embedding of the string
         """
 
-    def forward(self, x, duplicate=True):
+    def forward(self, x, duplicate=True, return_no_grad=False):
         """
         :param x: a tuple of batched source and target language embeddings
+        :param duplicate: whether to duplicate the source embedding
+        :param return_no_grad: whether to return a set of tensors with no grad
         :return: a tuple of batched source and target language embeddings, post projection
         """
         for k,v in x.items():
             x[k] = v.cuda()
-        # if we are given an entire batch for the target, dont do anything special
-        if 'target_batch' in x.keys():
-            return self.source_encoder(x["anchor"]), self.target_encoder(x["target_batch"])
-        else:
-            anchor = self.source_encoder(x["anchor"])
-            target = self.target_encoder(x["target"])
 
-            # we need to duplicate the target
-            if duplicate:
-                target = torch.cat([target.unsqueeze(1)] * target.shape[0], dim=1).transpose(0,1)
+
+        anchor = self.source_encoder(x["anchor"])
+        target = self.target_encoder(x["target"])
+
+        if return_no_grad:
+            with torch.no_grad():
+                anchor_no_grad = self.source_encoder(x["anchor"])
+                target_no_grad = self.target_encoder(x["target"])
+
+        # we need to duplicate the target
+        if duplicate:
+            target = torch.cat([target.unsqueeze(1)] * target.shape[0], dim=1).transpose(0,1)
+            if return_no_grad:
+                target_no_grad = torch.cat([target_no_grad.unsqueeze(1)] * target_no_grad.shape[0], dim=1).transpose(0,1)
 
         # normalize both anchor and target
         if not duplicate:
             anchor = torch.nn.functional.normalize(anchor, p=2, dim=1)
             target = torch.nn.functional.normalize(target, p=2, dim=1)
+            if return_no_grad:
+                anchor_no_grad = torch.nn.functional.normalize(anchor_no_grad, p=2, dim=1)
+                target_no_grad = torch.nn.functional.normalize(target_no_grad, p=2, dim=1)
 
-        return anchor, target
+        if return_no_grad:
+            return anchor, target, anchor_no_grad, target_no_grad
+        else:
+            return anchor, target
