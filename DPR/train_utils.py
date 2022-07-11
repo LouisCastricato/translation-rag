@@ -90,12 +90,17 @@ def train(model, dataset_loader, validation_loader=None, epochs : int = 10, nois
             pbar.set_description(f"Train loss: {loss_value}")
     return model
 
-def embed_valid(model, valid_dataloader, name : str, anchor_root : str = 'anchor_embeddings', positive_root : str = 'positive_embeddings'):
+def embed_valid(model, valid_dataloader, 
+    name : str, anchor_root : str = 'anchor_embeddings', 
+    positive_root : str = 'positive_embeddings', skip_positive : bool = False):
     """
     Returns embeddings of the validation set
     :param model: DPR model
     :param valid_dataloader: dataloader for the validation set
     :param name: identifier for anchor and positive embeddings
+    :param anchor_root: root for anchor embeddings (file directory)
+    :param positive_root: root for positive embeddings (file directory)
+    :param skip_positive: whether to skip the positive embeddings
     """
     with torch.no_grad():
         anchor_embeddings = []

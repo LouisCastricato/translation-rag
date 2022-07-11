@@ -32,5 +32,6 @@ class RAGDataset(torch.utils.data.Dataset):
         """
         return {
             'query_word': self.pair_dataset[idx][0],
-            'target_word': self.pair_dataset[idx][1]
+            'target_word': self.pair_dataset[idx][1],
+            'idx': idx
         }

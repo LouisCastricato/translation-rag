@@ -114,8 +114,8 @@ class KnownDimensionalityDataset(torch.utils.data.Dataset):
 # test functionality
 if __name__ == '__main__':
     dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
-                                    '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
-                                    'DPR-input-data/en-es.train.csv')
+                                    '/home/louis_huggingface_co/translation_rag/german/wiki.de.bin',
+                                    'DPR-input-data/en-de.train.csv')
     
     dataset_list = list()
     # save the dataset
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
     dataset_dict = convert_dict_of_tensors_to_list(stack_dicts(dataset_list))
-    save_to_json(dataset_dict, 'en-es.train.json')
+    save_to_json(dataset_dict, 'en-de.train.json')
 
 
     # save a copy of only the anchors, which we will use in the embedding layer
@@ -134,12 +134,12 @@ if __name__ == '__main__':
 
 
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
-    dataset_dict = stack_dicts(dataset_list)
-    save_to_json(dataset_dict, 'embeddings_en-es.train.json')
+    training_embedding_dataset_dict = stack_dicts(dataset_list)
+    save_to_json(training_embedding_dataset_dict, 'embeddings_en-de.train.json')
 
     dataset = PairedFastTextDataset('/home/louis_huggingface_co/translation_rag/english/wiki.en.bin',
-                                    '/home/louis_huggingface_co/translation_rag/spanish/wiki.es.bin',
-                                    'DPR-input-data/en-es.valid.csv')
+                                    '/home/louis_huggingface_co/translation_rag/german/wiki.de.bin',
+                                    'DPR-input-data/en-de.valid.csv')
     
     dataset_list = list()
     # save the dataset
@@ -148,7 +148,7 @@ if __name__ == '__main__':
 
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
     dataset_dict = convert_dict_of_tensors_to_list(stack_dicts(dataset_list))
-    save_to_json(dataset_dict, 'en-es.valid.json')
+    save_to_json(dataset_dict, 'en-de.valid.json')
 
 
     # save a copy of only the anchors, which we will use in the embedding layer
@@ -157,6 +157,10 @@ if __name__ == '__main__':
             dataset.pair_dataset[idx][0] : elem['anchor'].numpy().tolist()}
         
     # each element of dataset_list is a dictionary, we need to concat the torch tensors
-    dataset_dict = stack_dicts(dataset_list)
-    save_to_json(dataset_dict, 'embeddings_en-es.valid.json')
+    valid_embedding_dataset_dict = stack_dicts(dataset_list)
+    save_to_json(valid_embedding_dataset_dict, 'embeddings_en-de.valid.json')
+
+    # combine two dictionaries
+    dataset_dict = {**training_embedding_dataset_dict, **valid_embedding_dataset_dict}
+    save_to_json(dataset_dict, 'embeddings_en-de.json')
 

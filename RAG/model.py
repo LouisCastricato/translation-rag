@@ -3,6 +3,7 @@
 from functools import partial
 from more_itertools import flatten
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import sys
 from typing import Iterable, Dict, Union, Tuple, Any
@@ -20,7 +21,8 @@ class BaseRAG(torch.nn.Module):
         index_dir : str = None, 
         embedding_dir = None, 
         embd_size : int = 300, 
-        dropout : float = 0.1):
+        dropout : float = 0.1,
+        vocab_size=None):
 
         super(BaseRAG, self).__init__()
         """
@@ -44,19 +46,15 @@ class BaseRAG(torch.nn.Module):
         # initalize DPR
         self.dpr = SourceTargetDPR(embd_size, embd_size, dropout)
 
-        # initalize the reader model
-        self.lm_config = BartConfig(
-            encoder_layers=2, 
-            decoder_layers=2, 
-            d_model=embd_size, 
-            dropout=dropout,
-            encoder_attention_heads=10,
-            decoder_attention_heads=10)
+        # initialize the LM
+        if vocab_size is None:
+            self.vocab_size = len(self.faiss.index_id_to_db_id)
+        else:
+            self.vocab_size = vocab_size
+        self.language_model = nn.Linear(embd_size, self.vocab_size)
 
-        self.language_model = BartForConditionalGeneration(self.lm_config)
-        self.tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
-        print("Model initialized.")
-
+        print("Models initialized.")
+        print(vocab_size)
         self.embd_size = embd_size
     
     def coupling_loss(self, 
@@ -92,10 +90,10 @@ class BaseRAG(torch.nn.Module):
         :param reduction: the reduction method
         :return: the loss
         """
-        bs, seq_len, vocab_size = logprobs.shape
+        bs, vocab_size = logprobs.shape
         return F.cross_entropy(logprobs.view(-1, vocab_size), labels.view(-1), reduction=reduction)
 
-    def query(self, x : Dict, k : int = 5):
+    def query(self, x : Dict, k : int = 16):
         """
         Queries against a FAISS index by first embedding query and then querying the index
         :param x: a dictionary containing atleast the following keys:
@@ -150,7 +148,7 @@ class BaseRAG(torch.nn.Module):
                     return_tensors="pt") # ~ bs x 5
 
 
-    def forward(self, x : Dict, k : int = 5, debug : bool = False):
+    def forward(self, x : Dict, k : int = 16, debug : bool = False):
         """
         Forward pass of the model
         :param x: a dictionary containing atleast the following keys:
@@ -165,30 +163,20 @@ class BaseRAG(torch.nn.Module):
         source_word = list(flatten(query_results['source_word_id']))
         source_word_embedding = torch.tensor(query_results['source_word_embedding']).cuda()
 
-        query_embedding = query_results['query_embedding']
+        query_embedding = query_results['query_embedding'].cuda()
+        labels = x['idx'].cuda()
 
-        # get our source_ids and label_ids
-        source_ids = self.tokenize(source_word)
-        # account for bs = 1
-        if type(x['target_word']) != list:
-            label_ids = self.tokenize([x["target_word"]]) # ~ bs x 5
-        else:
-            label_ids = self.tokenize(x["target_word"])
 
         # if k > 1, interleave the label_ids
-        label_input_ids = label_ids.input_ids.cuda()
         if k > 1: 
             # we need to reshape the labels and query embeddings.
-            label_input_ids = label_input_ids.unsqueeze(1).repeat(1, k, 1)
-            label_input_ids = label_input_ids.view(-1, label_input_ids.shape[-1])
+            labels = labels.unsqueeze(1).repeat(1, k)
+            labels = labels.view(-1, labels.shape[-1])
 
             query_embedding = query_embedding.unsqueeze(1).repeat(1, k, 1)
 
         # run a forward pass on BART, record loss
-        model_output = self.language_model(
-            input_ids=source_ids.input_ids.cuda(),
-            attention_mask=source_ids.attention_mask.cuda())
-        #autoregressive_loss = self.autoregressive_loss(model_output, label_input_ids)
+        model_output = self.language_model(query_embedding).view(-1, self.vocab_size)
         
         # compute RAG's coupling loss
         coupling_loss = self.coupling_loss(
@@ -196,7 +184,7 @@ class BaseRAG(torch.nn.Module):
             model_output,
             query_embedding, 
             source_word_embedding, 
-            label_input_ids)
+            labels)
 
         if debug:
             return {
